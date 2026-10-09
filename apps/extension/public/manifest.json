@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "定向帖子评论助手",
+  "version": "0.9.11",
+  "description": "首页或搜索流逐帖浏览，多业务模板筛选，独立控制关注、点赞与 AI 评论。",
+  "action": { "default_title": "打开评论助手工作台" },
+  "side_panel": { "default_path": "sidepanel.html" },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "content_scripts": [{ "matches": ["http://127.0.0.1/*", "http://localhost/*", "https://www.xiaohongshu.com/*"], "js": ["content.js"], "run_at": "document_idle" }],
+  "permissions": ["sidePanel", "activeTab", "storage", "alarms", "scripting"],
+  "host_permissions": ["http://127.0.0.1/*", "http://localhost/*", "https://www.xiaohongshu.com/*"],
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'self'; connect-src http://127.0.0.1:3417" }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "@yuezhuang/gateway",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @yuezhuang/shared build && tsx watch src/server.ts",
+    "dev:trusted": "pnpm --filter @yuezhuang/shared build && NODE_EXTRA_CA_CERTS=../../certs/oci-paris-sub2api.pem tsx watch src/server.ts",
+    "dev:mock": "pnpm --filter @yuezhuang/shared build && APP_MODE=mock tsx watch src/server.ts",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "tsc --outDir dist"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.0.0",
+    "@yuezhuang/shared": "workspace:*",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.2.1",
+    "sql.js": "^1.14.2",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/sql.js": "^1.4.11",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.8"
+  }
+}

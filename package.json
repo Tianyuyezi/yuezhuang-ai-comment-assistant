@@ -1,0 +1,18 @@
+{
+  "name": "yuezhuang-ai-comment-assistant",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "scripts": {
+    "dev:mock": "pnpm --filter @yuezhuang/shared build && (pnpm --filter @yuezhuang/gateway dev:mock & pnpm --filter @yuezhuang/extension dev)",
+    "dev:gateway:trusted": "pnpm --filter @yuezhuang/gateway dev:trusted",
+    "dev": "pnpm --filter @yuezhuang/shared build && (pnpm --filter @yuezhuang/gateway dev & pnpm --filter @yuezhuang/extension dev)",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @yuezhuang/shared build && pnpm -r test",
+    "test:e2e": "pnpm --filter @yuezhuang/extension test:e2e",
+    "check:public-secrets": "node scripts/check-public-secrets.mjs",
+    "test:public-secrets": "node --test scripts/check-public-secrets.test.mjs",
+    "build": "pnpm -r build",
+    "package:extension": "pnpm build && cd apps/extension/dist && zip -FS -r ../yuezhuang-extension.zip ."
+  }
+}
