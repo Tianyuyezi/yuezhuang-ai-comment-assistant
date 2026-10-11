@@ -21,3 +21,5 @@
 .station-row input:not(:first-child) { flex: 1; min-width: 0; }
 .station-row span, .station-row button { flex-shrink: 0; }
 summary { cursor: pointer; }
+.model-settings fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.model-endpoint { overflow-wrap: anywhere; }

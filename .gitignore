@@ -16,6 +16,8 @@ output/
 test-results/
 playwright-report/
 apps/gateway/data/
+model-config.json
+model-config.json.*
 certs/
 *.pem
 *.key

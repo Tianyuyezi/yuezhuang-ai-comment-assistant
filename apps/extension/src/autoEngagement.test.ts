@@ -52,6 +52,28 @@ let publicationTransportLost: boolean;
 let publicationByNote: Map<string, any>;
 const event = () => ({ addListener: vi.fn() });
 const request = (type: string, fields: object = {}) => new Promise<any>(resolve => listener({ type, ...fields }, {}, resolve));
+describe('quiescing tasks for a model configuration change', () => {
+  it('stops tasks and holds a lock without receiving or storing model credentials', async () => {
+    local.autoModeState = { ...initialAutoModeState, status: 'running', runId: 'mode', taskId: 'task' };
+    const prepared = await request('MODEL_CONFIG_PREPARE');
+    expect(prepared.ok).toBe(true); expect(prepared.lockId).toEqual(expect.any(String));
+    expect(local.autoScanState.status).not.toBe('running'); expect(local.autoModeState.status).not.toBe('running');
+    expect((await request('MODEL_CONFIG_PREPARE')).reason).toBe('model_config_busy');
+    expect((await request('MODEL_CONFIG_FINISH', { lockId: 'wrong-lock' })).ok).toBe(false);
+    expect((await request('MODEL_CONFIG_FINISH', { lockId: prepared.lockId })).ok).toBe(true);
+    expect(events).toEqual([]); expect(navigation).toEqual([]);
+  });
+  it('recovers when a settings panel closes, without automatically restarting tasks', async () => {
+    const prepared = await request('MODEL_CONFIG_PREPARE'); expect(prepared.ok).toBe(true);
+    await vi.advanceTimersByTimeAsync(35_001);
+    expect(local.autoScanState.status).not.toBe('running'); expect(local.autoModeState.status).not.toBe('running');
+    const next = await request('MODEL_CONFIG_PREPARE'); expect(next.ok).toBe(true); await request('MODEL_CONFIG_FINISH', { lockId: next.lockId });
+  });
+  it('rejects page content scripts trying to modify the model configuration lock', async () => {
+    const result = await new Promise<any>(resolve => listener({ type: 'MODEL_CONFIG_PREPARE' }, { tab: { id: 1 } }, resolve));
+    expect(result).toEqual({ ok: false, reason: 'invalid_origin' }); expect(local.autoScanState.status).toBe('running');
+  });
+});
 function candidate(id: string) {
   return searchCandidateSchema.parse({ id, taskId: 'task', noteId: `xhs:${id}`, url: `https://www.xiaohongshu.com/explore/${id}`, title: '上海求租', snippet: '找合租房间', status: 'new', reason: '', capturedAt: '2026-10-05', note: null, draft: '' });
 }

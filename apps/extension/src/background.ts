@@ -25,6 +25,7 @@ let modeInFlight = false;
 let modeStarting = false;
 let demandInFlight = false;
 let businessChanging = false;
+let modelConfigLock: { id: string; timer: ReturnType<typeof setTimeout> } | null = null;
 let scanTimer: ReturnType<typeof setTimeout> | null = null;
 let modeTimer: ReturnType<typeof setTimeout> | null = null;
 const demandLoops = new Set<string>();
@@ -1058,6 +1059,25 @@ async function stopForBusinessChange() {
   await stopDemand();
 }
 
+async function prepareModelConfigChange() {
+  if (businessChanging || modeStarting) throw new Error('model_config_busy');
+  businessChanging = true;
+  try {
+    await stopForBusinessChange();
+    const id = crypto.randomUUID();
+    // A closed settings panel must not leave the worker locked indefinitely.
+    const timer = setTimeout(() => finishModelConfigChange(id), 35_000);
+    modelConfigLock = { id, timer };
+    return id;
+  } catch { businessChanging = false; throw new Error('model_request_in_progress'); }
+}
+
+function finishModelConfigChange(id: string) {
+  if (modelConfigLock?.id !== id) return false;
+  clearTimeout(modelConfigLock.timer); modelConfigLock = null; businessChanging = false;
+  return true;
+}
+
 async function changeBusinessTemplate(action: string, input?: unknown, templateId?: string) {
   if (businessChanging) throw new Error('业务模板正在更新，请稍候。');
   businessChanging = true;
@@ -1138,8 +1158,14 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   });
 });
 
-chrome.runtime.onMessage.addListener((message: { type?: string; interactionId?: string; taskId?: string; tabId?: number; style?: string; publishEnabled?: boolean; likeEnabled?: boolean; followEnabled?: boolean; paceEnabled?: boolean; source?: 'home' | 'search'; keyword?: string | null; template?: unknown; templateId?: string }, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: { type?: string; lockId?: string; interactionId?: string; taskId?: string; tabId?: number; style?: string; publishEnabled?: boolean; likeEnabled?: boolean; followEnabled?: boolean; paceEnabled?: boolean; source?: 'home' | 'search'; keyword?: string | null; template?: unknown; templateId?: string }, _sender, sendResponse) => {
   if (message.type === 'EXTENSION_VERSION') { sendResponse({ version: EXTENSION_VERSION }); return; }
+  if (message.type === 'MODEL_CONFIG_PREPARE' || message.type === 'MODEL_CONFIG_FINISH') {
+    if (_sender.tab) { sendResponse({ ok: false, reason: 'invalid_origin' }); return; }
+    if (message.type === 'MODEL_CONFIG_FINISH') { sendResponse({ ok: Boolean(message.lockId && finishModelConfigChange(message.lockId)) }); return; }
+    void prepareModelConfigChange().then(lockId => sendResponse({ ok: true, lockId })).catch(error => sendResponse({ ok: false, reason: error instanceof Error ? error.message : 'model_config_busy' }));
+    return true;
+  }
   if (message.type === 'PUBLICATION_RECHECK' && message.interactionId && message.tabId !== undefined) {
     void recheckPublication(message.interactionId, message.tabId).then(result => sendResponse({ ok: true, ...result })).catch(error => sendResponse({ ok: false, reason: String(error) }));
     return true;

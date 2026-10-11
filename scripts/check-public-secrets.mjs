@@ -10,6 +10,7 @@ export function forbiddenPublicPath(file) {
   const name = path.split('/').at(-1);
   if (/(^|\/)(node_modules|dist|certs|output|coverage|\.sf|\.sfdx|\.codex|\.playwright-cli|test-results|playwright-report)(\/|$)/i.test(path)) return true;
   if (/^apps\/gateway\/data\//.test(path)) return true;
+  if (/^model-config\.json(?:\.|$)/i.test(name)) return true;
   if (/^(README\.internal\.md|IMPLEMENTATION_STATUS\.md|FIND_DEMAND_PRD_v1\.md)$/i.test(name)) return true;
   if (/(?:\.pem|\.key|\.p12|\.pfx|\.sqlite3?|\.sqlite-.*|\.db|\.db-.*|\.log|\.zip)$/i.test(name)) return true;
   if (name === '.DS_Store') return true;

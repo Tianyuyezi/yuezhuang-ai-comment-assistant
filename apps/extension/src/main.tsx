@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { businessTypeLabel, campaignBusinessType, campaignConfigurationIssue, candidateEngagementPolicy, interactionBlocksFirstContact, templateSchema, type Assessment, type BusinessTemplate, type Campaign, type Interaction, type NoteSnapshot, type SearchCandidate, type SearchTask, type Template } from '@yuezhuang/shared';
 import { loadBusinessTemplates, loadCampaign, loadCampaignSnapshots, loadInteractions, loadSearchCandidates, loadSearchTasks, loadTemplates, saveInteraction, saveSearchCandidate, saveSearchTask, saveTemplates } from './storage';
 import { BusinessTemplates, type BusinessTemplateAction } from './BusinessTemplates';
+import { ModelSettings } from './ModelSettings';
+import { createModelSettingsClient } from './modelSettingsClient';
 import { autoTaskLabel, autoTaskSource, isXhsTaskPage, type AutoSource } from './xhs';
 import { BrowseTaskControls } from './BrowseTaskControls';
 import { connectedPageMessage, ensurePageConnection } from './pageConnection';
@@ -71,6 +73,15 @@ function App() {
   const [autoScan, setAutoScan] = useState<AutoScanState>(initialAutoScanState);
   const [autoMode, setAutoMode] = useState<AutoModeState>(initialAutoModeState);
   const [pairingToken, setPairingToken] = useState(() => sessionStorage.getItem('assistant-pairing-token') ?? '');
+  const modelSettingsClient = useMemo(() => {
+    const client = createModelSettingsClient(gatewayUrl, pairingToken);
+    return { ...client, save: async (value: Parameters<typeof client.save>[0]) => {
+      const prepared = await chrome.runtime.sendMessage({ type: 'MODEL_CONFIG_PREPARE' }) as { ok: boolean; lockId?: string; reason?: string };
+      if (!prepared.ok || !prepared.lockId) throw new Error(prepared.reason ?? 'model_config_busy');
+      try { return await client.save(value); }
+      finally { await chrome.runtime.sendMessage({ type: 'MODEL_CONFIG_FINISH', lockId: prepared.lockId }).catch(() => undefined); }
+    } };
+  }, [pairingToken]);
   const draftStyle = campaign.commentStyle ?? localStorage.getItem('assistant-draft-style') ?? '自然、简短、根据帖子具体需求回应，不夸大';
   const [commentDiagnostic, setCommentDiagnostic] = useState('');
   const [publishEnabled, setPublishEnabled] = useState(false);
@@ -718,12 +729,13 @@ function App() {
       </>}
       {tab === '话术' && <section className="card"><h2>话术库</h2><button onClick={() => void addTemplate()}>新增话术</button><p className="muted">离开输入框时保存；每次修改撤销审核，只有明确审核启用的话术参与推荐。</p>{templates.map(item => <article className="card" key={`${item.id}:${item.version}`}><label>名称</label><input defaultValue={item.name} disabled={Boolean(item.archivedAt)} onBlur={event => { if (event.target.value !== item.name) void changeTemplate(item.id, { name: event.target.value, enabled: false, approvalStatus: 'draft', version: item.version + 1 }); }} /><label>正文</label><textarea defaultValue={item.body} disabled={Boolean(item.archivedAt)} onBlur={event => { if (event.target.value !== item.body) void changeTemplate(item.id, { body: event.target.value, enabled: false, approvalStatus: 'draft', version: item.version + 1 }); }} /><label>适用业务模板</label><select value={item.businessTemplateId ?? ''} disabled={Boolean(item.archivedAt)} onChange={event => void changeTemplate(item.id, { businessTemplateId: event.target.value || null, enabled: false, approvalStatus: 'draft', version: item.version + 1 })}><option value="">通用</option>{businessTemplates.map(business => <option key={business.id} value={business.id}>{business.name}{business.archivedAt ? '（已归档）' : ''}</option>)}</select><label>适用城市，留空代表不限</label><input defaultValue={joinWords(item.cities)} disabled={Boolean(item.archivedAt)} onBlur={event => { if (event.target.value !== joinWords(item.cities)) void changeTemplate(item.id, { cities: splitWords(event.target.value), enabled: false, approvalStatus: 'draft', version: item.version + 1 }); }} /><p>{item.approvalStatus} · v{item.version}</p>{!item.archivedAt && <div className="row"><button disabled={item.enabled || !item.body.trim()} onClick={() => void changeTemplate(item.id, { enabled: true, approvalStatus: 'approved' })}>人工审核并启用</button><button className="secondary" onClick={() => void changeTemplate(item.id, { enabled: false, archivedAt: new Date().toISOString() })}>归档</button></div>}</article>)}</section>}
       {tab === '设置' && <>
-        <BusinessTemplates templates={businessTemplates} active={campaign} onAction={businessTemplateAction} />
-        <details className="card"><summary>模型网关连接设置</summary>
-          <label>本机网关配对令牌</label><input type="password" value={pairingToken} onChange={event => { setPairingToken(event.target.value); sessionStorage.setItem('assistant-pairing-token', event.target.value); }} />
+        <ModelSettings client={modelSettingsClient} gatewayUrl={gatewayUrl} disabled={busy} beforeSave={() => ensureBackgroundVersion()} onSaved={config => { setMode(config.mode); setGateway(`已连接 · ${config.mode} · ${config.modelId}`); }} />
+        <details className="card"><summary>本机网关配对设置（不是模型密钥）</summary>
+          <label htmlFor="gateway-pairing-token">本机网关配对令牌</label><input id="gateway-pairing-token" type="password" value={pairingToken} autoComplete="off" onChange={event => { setPairingToken(event.target.value); sessionStorage.setItem('assistant-pairing-token', event.target.value); }} />
           {/^sk-/i.test(pairingToken) && <p className="warning">模型密钥应配置在本机网关，请勿填写到配对令牌中。</p>}
           <p>模型模式：{mode}。模型密钥只保存在本机网关。</p>
         </details>
+        <BusinessTemplates templates={businessTemplates} active={campaign} onAction={businessTemplateAction} />
       </>}
       {tab === '记录' && <section className="card"><h2>本地操作记录</h2><p className="muted">填入和复制不等于发布。</p>
         <label>业务模板</label><select value={recordTemplateFilter} onChange={event => setRecordTemplateFilter(event.target.value)}><option value="all">全部历史业务</option>{businessTemplates.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}<option value="legacy">未关联的旧记录</option></select>

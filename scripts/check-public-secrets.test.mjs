@@ -10,7 +10,7 @@ const fakeKey = () => ['sk', 'a'.repeat(32)].join('-');
 const assignment = (name, value) => `${name}=${value}\n`;
 
 test('private config and runtime files are excluded, empty templates are allowed', () => {
-  for (const file of ['gateway.env', '.env.local', 'apps/gateway/data/demands.sqlite', '.sf/orgs/cache.json', 'certs/local.pem', 'local.key', 'output/profile/state.json', 'README.internal.md', 'IMPLEMENTATION_STATUS.md']) {
+  for (const file of ['gateway.env', '.env.local', 'apps/gateway/data/demands.sqlite', 'model-config.json', 'model-config.json.backup', '.sf/orgs/cache.json', 'certs/local.pem', 'local.key', 'output/profile/state.json', 'README.internal.md', 'IMPLEMENTATION_STATUS.md']) {
     assert.equal(forbiddenPublicPath(file), true, file);
   }
   for (const file of ['gateway.env.example', '.env.example', '.env.local.example', 'apps/gateway/src/server.ts', 'pnpm-lock.yaml']) assert.equal(forbiddenPublicPath(file), false, file);
